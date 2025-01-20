@@ -1,8 +1,8 @@
 ---
 layout: single
-title: Unbalanced - Hack The Box
+title: EscapeTwo  - Hack The Box
 excerpt: "To solve Unbalanced, we'll find configuration backups files in EncFS and after cracking the password and figuring out how EncFS works, we get the Squid proxy cache manager password that let us discover internal hosts. Proxying through Squid, we then land on a login page that uses Xpath to query an XML backend database. We perform Xpath injection to retrieve the password of each user, then port forward through the SSH shell to reach a Pi-Hole instance, vulnerable to a command injection vulnerability."
-date: 2020-12-05
+date: 2025-01-16
 classes: wide
 header:
   teaser: /assets/images/htb-writeup-unbalanced/unbalanced_logo.png
@@ -21,85 +21,93 @@ tags:
 ---
 
 ![](/assets/images/htb-writeup-unbalanced/unbalanced_logo.png)
-
-To solve Unbalanced, we'll find configuration backups files in EncFS and after cracking the password and figuring out how EncFS works, we get the Squid proxy cache manager password that let us discover internal hosts. Proxying through Squid, we then land on a login page that uses Xpath to query an XML backend database. We perform Xpath injection to retrieve the password of each user, then port forward through the SSH shell to reach a Pi-Hole instance, vulnerable to a command injection vulnerability.
+## rose / KxEPkKe6R8su
 
 ## Portscan
+nmap -Pn -sS -sC -sV -p- -T5 --max-rate 10000 -oN escape-two.txt 10.10.11.51
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801192958121.png)
+53/tcp    - domain       - Simple DNS Plus
+  88/tcp    - kerberos-sec - Microsoft Windows Kerberos  
+135/tcp   - msrpc        - Microsoft Windows RPC  
+139/tcp   - netbios-ssn  - Microsoft Windows NetBIOS  
+389/tcp   - ldap         - Microsoft Windows Active Directory LDAP  
+445/tcp   - microsoft-ds - Posiblemente SMB  
+464/tcp   - kpasswd5     - Posiblemente Kerberos  
+593/tcp   - ncacn_http   - Microsoft Windows RPC over HTTP  
+636/tcp   - ssl/ldap     - LDAP sobre SSL  
+1433/tcp  - ms-sql-s     - Microsoft SQL Server  
+3268/tcp  - ldap         - Microsoft Windows Active Directory LDAP  
+3269/tcp  - ssl/ldap     - LDAP sobre SSL  
+5985/tcp  - http         - Microsoft HTTPAPI (SSDP/UPnP)  
+9389/tcp  - mc-nmf       - .NET Message Framing  
+47001/tcp - http         - Microsoft HTTPAPI (SSDP/UPnP)  
+49664-49808/tcp - msrpc - Microsoft Windows RPC (puertos dinámicos)
+
+
+
+
 
 ## Rsync & EncFS
 
-We can list the available modules on the rsync server by specifying the rsync URL and leaving off the module name. The output shows there is an available module called `conf_backups`.
+ Bandera de usuario
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801192743922.png)
+Intente una enumeración básica de smb
 
-After downloading the remote files we end up with a bunch of files with weird random names.
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801193241170.png)
-
-There's also a file `.encfs6.xml` that contains the configuration for `EncFS 1.9.5`. The encoded key data and salt for the file encryption is contained in the XML file below:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE boost_serialization>
-<boost_serialization signature="serialization::archive" version="7">
-    <cfg class_id="0" tracking_level="0" version="20">
-        <version>20100713</version>
-        <creator>EncFS 1.9.5</creator>
-        <cipherAlg class_id="1" tracking_level="0" version="0">
-            <name>ssl/aes</name>
-            <major>3</major>
-            <minor>0</minor>
-        </cipherAlg>
-        <nameAlg>
-            <name>nameio/block</name>
-            <major>4</major>
-            <minor>0</minor>
-        </nameAlg>
-        <keySize>192</keySize>
-        <blockSize>1024</blockSize>
-        <plainData>0</plainData>
-        <uniqueIV>1</uniqueIV>
-        <chainedNameIV>1</chainedNameIV>
-        <externalIVChaining>0</externalIVChaining>
-        <blockMACBytes>0</blockMACBytes>
-        <blockMACRandBytes>0</blockMACRandBytes>
-        <allowHoles>1</allowHoles>
-        <encodedKeySize>44</encodedKeySize>
-        <encodedKeyData>
-GypYDeps2hrt2W0LcvQ94TKyOfUcIkhSAw3+iJLaLK0yntwAaBWj6EuIet0=
-</encodedKeyData>
-        <saltLen>20</saltLen>
-        <saltData>
-mRdqbk2WwLMrrZ1P6z2OQlFl8QU=
-</saltData>
-        <kdfIterations>580280</kdfIterations>
-        <desiredKDFDuration>500</desiredKDFDuration>
-    </cfg>
-</boost_serialization>
+```
+poetry run python netexec.py smb 10.10.11.51 -u rose -p 'KxEPkKe6R8su' --shares                                                     main 
+SMB         10.10.11.51     445    DC01             [*] Windows 10 / Server 2019 Build 17763 x64 (name:DC01) (domain:sequel.htb) (signing:True) (SMBv1:False)
+SMB         10.10.11.51     445    DC01             [+] sequel.htb\rose:KxEPkKe6R8su 
+SMB         10.10.11.51     445    DC01             [*] Enumerated shares
+SMB         10.10.11.51     445    DC01             Share           Permissions     Remark
+SMB         10.10.11.51     445    DC01             -----           -----------     ------
+SMB         10.10.11.51     445    DC01             Accounting Department READ            
+SMB         10.10.11.51     445    DC01             ADMIN$                          Remote Admin
+SMB         10.10.11.51     445    DC01             C$                              Default share
+SMB         10.10.11.51     445    DC01             IPC$            READ            Remote IPC
+SMB         10.10.11.51     445    DC01             NETLOGON        READ            Logon server share 
+SMB         10.10.11.51     445    DC01             SYSVOL          READ            Logon server share 
+SMB         10.10.11.51     445    DC01             Users           READ        
 ```
 
-I've never used EncFS before but some quick research shows that it's an encrypted filesystem in user-space running with regular user permissions using the FUSE library. 
+Mirando los catálogos, encontramos el Departamento de Contabilidad que nos interesa. Tenemos que descargarlo usando el comando y luego desempacarlo.
 
-> Two directories are involved in mounting an EncFS filesystem: the source directory, and the mountpoint. Each file in the mountpoint has a specific file in the source directory that corresponds to it. The file in the mountpoint provides the unencrypted view of the one in the source directory. Filenames are encrypted in the source directory.
->
-> Files are encrypted using a volume key, which is stored either within or outside the encrypted source directory. A password is used to decrypt this key.  
+```
+smbclient //escape.two.htb/Accounting\ Department -U Rose%KxEPkKe6R8su                                                                              130 ↵  
 
-We don't have the password but luckily there's already a python script in John the Ripper that can extract the hash from the XML and produce it  in a format that can be understood by John the Ripper. 
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                   D        0  Sun Jun  9 13:52:21 2024
+  ..                                  D        0  Sun Jun  9 13:52:21 2024
+  accounting_2024.xlsx                A    10217  Sun Jun  9 13:14:49 2024
+  accounts.xlsx                       A     6780  Sun Jun  9 13:52:07 2024
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801194238244.png)
+                6367231 blocks of size 4096. 910811 blocks available
 
-We'll use the `rockyou.txt` wordlist with John the Ripper to crack it, recovering the password: `bubblegum`
+mget *
+Get file accounting_2024.xlsx? y
+getting file \accounting_2024.xlsx of size 10217 as accounting_2024.xlsx (25.7 KiloBytes/sec) (average 25.7 KiloBytes/sec)
+Get file accounts.xlsx? y
+getting file \accounts.xlsx of size 6780 as accounts.xlsx (19.8 KiloBytes/sec) (average 23.0 KiloBytes/sec)
+``` 
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801194408192.png)
+ya depues de descargar lso 2 archivos viendo la extencion en gogle veo muachas aplicaiones para manipular el archivo
 
-We then mount the filesystem in the `mnt` directory, and we now have access to the decrypted files. We'll look through those files next to find credentials and useful information.
+![](/assets/images/htb-writeup-unbalanced/xml.png)
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801195304488.png)
+La cuenta sa es la cuenta de administración predeterminada para conectar y administrar la base de datos MSSQL. Comprobar mostró que la cuenta es válida, intente utilizar mssqlclient de impacket para iniciar sesión.
 
-## Squid
+![](/assets/images/htb-writeup-unbalanced/sql.png)
 
+Genial, ahora somos sas. Por defecto, el procedimiento almacenado xp.cmdshell está desactivado en MSSQL, pero podemos habilitarlo y disfrutar de todos sus beneficios.
+
+Asegúrese de buscar al anfitrión en busca de algo útil. Por ejemplo, tiene archivos notables para la implementación de MSSQL.
+
+![](/assets/images/htb-writeup-unbalanced/sql1.png)
+
+evil-winrm -i sequel.htb -u ryan -p 'WqSZAF6CysDQbGb3'
+
+![](/assets/images/htb-writeup-unbalanced/evil.png)
 The `squid.conf` configuration is what we'll be looking at next. Squid is an open-source caching proxy for HTTP and HTTPS traffic. The configuration contains security rules restricting access to the intranet site. From the configuration we find a hostname: `intranet.unbalanced.htb`. The configuration restricts access to the backend networks but the `acl intranet_net dst -n 172.16.0.0/12` will allow the proxy to reach that network. We don't have the IP for the  `intranet.unbalanced.htb` host but we can guess it'll be in that network.
 
 ```
