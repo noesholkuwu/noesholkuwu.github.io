@@ -20,7 +20,7 @@ tags:
   - command injection
 ---
 
-![](/assets/images/portada.png)
+![](/assets/images/htb-writeup-unbalanced/portada2.png)
 ## rose / KxEPkKe6R8su
 
 ## Portscan
