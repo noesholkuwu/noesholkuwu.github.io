@@ -5,7 +5,7 @@ excerpt: "To solve Unbalanced, we'll find configuration backups files in EncFS a
 date: 2025-01-16
 classes: wide
 header:
-  teaser: /assets/images/htb-writeup-unbalanced/unbalanced_logo.png
+  teaser: /assets/images/htb-writeup-unbalanced/portada.png
   teaser_home_page: true
   icon: /assets/images/hackthebox.webp
 categories:
@@ -20,7 +20,7 @@ tags:
   - command injection
 ---
 
-![](/assets/images/htb-writeup-unbalanced/unbalanced_logo.png)
+![](/assets/images/portada.png)
 ## rose / KxEPkKe6R8su
 
 ## Portscan
