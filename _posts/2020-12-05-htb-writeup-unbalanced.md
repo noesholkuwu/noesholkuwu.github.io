@@ -12,12 +12,12 @@ categories:
   - hackthebox
   - infosec
 tags:  
-  - rsync
-  - encfs
-  - squid
-  - xpath
-  - CVE-2020-11108
-  - command injection
+  - nmap
+  - smb user crack
+  - smb file
+  - sql
+  - escalar de privilegio
+  - 
 ---
 
 ![](/assets/images/htb-writeup-unbalanced/portada2.png)
