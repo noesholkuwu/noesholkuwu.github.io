@@ -1,7 +1,7 @@
 ---
 layout: single
-title: instant - Hack The Box
-excerpt: "Buff is pretty straightforward: Use a public exploit against the Gym Management System, then get RCE. Do some port-forwarding, then use another exploit (buffer overflow against Cloudme Sync) to get Administrator access."
+title: instant - Hack The Box 
+excerpt : "Instantes una máquina de Hack The Box centrada en ingeniería inversa y APIs. El flujo es Análisis de la APK Se decompila una aplicación móvil para obtener información como subdominios o claves.Enumeración: Se investigan los subdominios y endpoints de la API descubiertos. Explotación: Se abusa de vulnerabilidades en la API para ganar acceso inicial. Escalada Se buscan archivos sensibles en el sistema (como backups) para obtener privilegios más altos."
 date: 2025-01-22
 classes: wide
 header:
@@ -13,9 +13,8 @@ categories:
   - infosec
 tags:
   - nmap
-  - cve
+  - analyze apk 
   - gobuster
-  - ssh
   - JWT token
 ---
 

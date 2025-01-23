@@ -1,7 +1,7 @@
 ---
 layout: single
 title: EscapeTwo  - Hack The Box
-excerpt: "To solve Unbalanced, we'll find configuration backups files in EncFS and after cracking the password and figuring out how EncFS works, we get the Squid proxy cache manager password that let us discover internal hosts. Proxying through Squid, we then land on a login page that uses Xpath to query an XML backend database. We perform Xpath injection to retrieve the password of each user, then port forward through the SSH shell to reach a Pi-Hole instance, vulnerable to a command injection vulnerability."
+excerpt: "Enumeración inicial: Identificar servicios como SMB, Kerberos y LDAP. Estos revelan información clave, como el dominio y usuarios válidos. Ataque inicial Utilizar técnicas como Kerberoasting o ASREPRoasting para obtener hashes de contraseñas. Esto puede incluir herramientas como GetNPUsers.py o impacket.Explotación Usar credenciales o hashes obtenidos para acceder al sistema mediante RDP o SMB.Una vez dentro, se debe explorar el sistema para descubrir más información."
 date: 2025-01-16
 classes: wide
 header:
@@ -13,13 +13,16 @@ categories:
   - infosec
 tags:  
   - nmap
-  - smb user crack
-  - smb file
-  - sql
-  - escalar de privilegio
+  - SMB
+  - Kerberoasting
+  - Active Directory
   - 
 ---
-
+numeración
+Ataque
+Acceso
+Escalada
+Root
 ![](/assets/images/htb-writeup-unbalanced/portada2.png)
 ## rose / KxEPkKe6R8su
 
