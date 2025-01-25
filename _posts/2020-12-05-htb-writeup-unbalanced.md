@@ -5,7 +5,7 @@ excerpt: "Enumeración inicial: Identificar servicios como SMB, Kerberos y LDAP.
 date: 2025-01-16
 classes: wide
 header:
-  teaser: /assets/images/htb-writeup-unbalanced/portada.png
+  teaser: /assets/images/htb-writeup-unbalanced/porta-modified.png
   teaser_home_page: true
   icon: /assets/images/hackthebox.webp
 categories:
@@ -23,7 +23,7 @@ Ataque
 Acceso
 Escalada
 Root
-![](/assets/images/htb-writeup-unbalanced/portada2.png)
+![](/assets/images/htb-writeup-unbalanced/porta-modified.png)
 ## rose / KxEPkKe6R8su
 
 ## Portscan
