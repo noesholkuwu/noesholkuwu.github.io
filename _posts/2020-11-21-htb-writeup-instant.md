@@ -5,7 +5,7 @@ excerpt : "Instantes una máquina de Hack The Box centrada en ingeniería invers
 date: 2025-01-22
 classes: wide
 header:
-  teaser: /assets/images/htb-writeup-buff/buff_logo.png
+  teaser: /assets/images/htb-writeup-instant/instant.png
   teaser_home_page: true
   icon: /assets/images/hackthebox.webp
 categories:
@@ -18,7 +18,7 @@ tags:
   - JWT token
 ---
 
-![](/assets/images/htb-writeup-buff/buff_logo.png)
+![](/assets/images/htb-writeup-instant/instant.png)
 
 Como siempre, comencé con un escaneo inicial de Nmap para identificar puertos abiertos en el host. Una vez completado el escaneo, solo había dos puertos abiertos: 22 y 80.
 

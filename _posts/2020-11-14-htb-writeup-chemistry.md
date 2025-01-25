@@ -5,7 +5,7 @@ excerpt: "resumen de la maquina se necesito un escaneo y en pagina encontrar una
 date: 2024-12-04
 classes: wide
 header:
-  teaser: /assets/images/htb-writeup-chemistry/chemistry.png
+  teaser: /assets/images/htb-writeup-chemistry/chemy2-modified.png
   teaser_home_page: true
   icon: /assets/images/hackthebox.webp
 categories:
@@ -18,7 +18,7 @@ tags:
   - CVE-2024-23334-PoC
 ---
 
-![](/assets/images/htb-writeup-chemistry/chemistry2.png)
+![](/assets/images/htb-writeup-chemistry/chemy2-modified.png)
 
 Intense starts with code review of a flask application where we find an SQL injection vulnerability that we exploit with a time-based technique.  After retrieving the admin hash, we'll use a hash length extension attack to append the admin username and hash that we found in the database, while keeping the signature valid, then use a path traversal vulnerability to read the snmp configuration file. With the SNMP read-write community string we can execute commands with the daemon user. To escalate to root, we'll create an SNMP configuration file with the `agentUser` set to `root`, then wait for the SNMP daemon to restart to so we can execute commands as root.
 
