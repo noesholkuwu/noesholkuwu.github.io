@@ -1,34 +1,29 @@
 ---
 layout: single
 title: underpass - Hack The Box
-excerpt: "Blackfield was a fun Windows box where we get a list of potential usernames from an open SMB share, validate that list using kerbrute, then find and crack the hash of an account with the AS-REProasting technique. After getting that first user, we'll use Bloodhound to discover that we can change another account's password, then from there access a previously locked down SMB share, retrieve an LSASS dump file and get more credentials. For the last part of the box we'll abuse the Backup Operators role to download a copy of the NTDS.dit file and recover the administrator NT hash."
+excerpt: "Underpass es una máquina de nivel fácil que, para explotarla, necesité hacer mucho fuzzing. Las credenciales venían en el archivo install, y tuve que seguir buscando para encontrar algo más, ya que el panel de autenticación daba problemas. Después de obtener las credenciales y autenticarme, el hash estaba en user"
 date: 2020-10-03
 classes: wide
 header:
-  teaser: /assets/images/htb-writeup-blackfield/blackfield_logo.png
+  teaser: /assets/images/htb-writeup-underpass/portunderpass.png
   teaser_home_page: true
   icon: /assets/images/hackthebox.webp
 categories:
   - hackthebox
   - infosec
 tags:
-  - ad
-  - backup operators
-  - asrep
-  - lsass
-  - pypykatz
-  - usodllloader
-  - impacket
-  - bloodhound
+  - nmap
+  - dirseach
+  - john
 ---
 
-![](/assets/images/htb-writeup-blackfield/blackfield_logo.png)
+![](/assets/images/htb-writeup-underpass/portunderpass2.png)
 
-Blackfield was a fun Windows box where we get a list of potential usernames from an open SMB share, validate that list using kerbrute, then find and crack the hash of an account with the AS-REProasting technique. After getting that first user, we'll use Bloodhound to discover that we can change another account's password, then from there access a previously locked down SMB share, retrieve an LSASS dump file and get more credentials. For the last part of the box we'll abuse the Backup Operators role to download a copy of the NTDS.dit file and recover the administrator NT hash.
+Underpass es una máquina de nivel fácil que, para explotarla, necesité hacer mucho fuzzing. Las credenciales venían en el archivo install, y tuve que seguir buscando para encontrar algo más, ya que el panel de autenticación daba problemas. Después de obtener las credenciales y autenticarme, el hash estaba en user
 
 ## Portscan
 
-We'll start this box like any other machine, by scanning the open ports to identify the operating system and services running. We're pretty confident that this box is is configured as a domain controller because port 88 for Kerberos is listening, as well as LDAP on port 389. The service running on port 88 is responsible for authenticating users on the domain and issuing Kerberos tickets.
+
 
 ```
   33   │ ┌──(noesholk㉿noes)-[~]
