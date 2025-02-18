@@ -1,6 +1,6 @@
 ---
 layout: single
-title: Resolute - Hack The Box
+title: titanic - Hack The Box
 excerpt: "Titanic, una máquina nivel fácil, resultó ser muy fácil. Solo fue un LFI en la página principal encontré un archivo SQL gracias al local file y así pude entrar a la SSH, tener una consola interactiva y tuve que escribir un pequeño script para poder leer root flag"
 date: 2020-05-30
 classes: wide
