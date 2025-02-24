@@ -1,16 +1,15 @@
 ---
 layout: single
-title: symfonos2 - Hack The Box
+title: symfonos2 - vulnhub
 excerpt: "comencé con un escaneo y encontré un log en SMB que me dio pistas. Luego, vi que el servidor tenía ProFTPD 1.3.5, así que abusé de la funcionalidad de copiar y pegar archivos dentro del FTP. Ahí encontré un script .ash con credenciales, lo que me permitió conectarme al sistema. Una vez dentro, descubrí un puerto interno que no era accesible desde el exterior. Hice port forwarding para exponerlo y terminé encontrando una página vulnerable. A partir de ahí, exploté la vulnerabilidad y conseguí acceso total a la máquina"
-date: 2020-04-25
+date: 2023-01-12
 classes: wide
 header:
   teaser: /assets/images/htb-writeup-symfonos2/symfonos2.png
   teaser_home_page: true
   icon: /assets/images/hackthebox.webp
 categories:
-  - hackthebox
-  - infosec
+  - vulnhub
 tags:
   - nmap
   - smb
