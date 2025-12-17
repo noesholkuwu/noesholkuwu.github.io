@@ -17,7 +17,7 @@ tags:
   - ssh
 ---
 
-![](/assets/images/htb-writeup-postman/cuento.png)
+![](/assets/images/htb-writeup-cuento/cuento.png)
 
 
 ## Summary
@@ -202,7 +202,7 @@ we can run a program as root but we still don't know what it does, let's
 read it, it took me some minutes to analyze how to abuse this since it's
 a program with 643 lines
 
-![ima](/assets/images/htb-writeup-postman/cuento_v2.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v2.png)
 
 Analysis of the Python binary
 
@@ -218,23 +218,23 @@ echo -n "whoami" | xxd -p
 ```
 
 
-![ima](/assets/images/htb-writeup-postman/cuento_v23.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v23.png)
 
 The script displays the command output as if it were a memory error, making the exploitation more stealthy.
 
-![ima](/assets/images/htb-writeup-postman/cuento_v24.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v24.png)
 
 Let's try to make a reverse shell already knowing the vulnerability
 
 
-![ima](/assets/images/htb-writeup-postman/cuento_v26.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v26.png)
 
 
 and we should receive a shell since we set up a netcat listener on port 1212.
 
 
 
-![ima](/assets/images/htb-writeup-postman/cuento_v25.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v25.png)
 
 
 
@@ -332,24 +332,24 @@ And we'll do it using the raton credentials since the password found in env didn
 
 
 
-![ima](/assets/images/htb-writeup-postman/cuento_v27.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v27.png)
 
 After verifying that we were able to forward port 5000 to my port 1111 and saw that it looked like a panel, we tried th
 e credentials of the user raton as well as common ones (admin, administrator, etc.).
 
-![ima](/assets/images/htb-writeup-postman/cuento_v28.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v28.png)
 
 Then we remembered a password we had found: VillaeEla13. We tried it with raton and it worked, and then we used it with
  the user churrumais and it also worked.
 
-![ima](/assets/images/htb-writeup-postman/cuento_v29.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v29.png)
 
 It seems that through patterns we can perform a system analysis so that the user churrumais is responsible for monitori
 ng it.
 
 
 
-![ima](/assets/images/htb-writeup-postman/cuento_v30.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v30.png)
 
 
 
@@ -368,7 +368,7 @@ We tried to set up a listener on port 1414 and get a shell, since we can inject 
 ng elevated privileges. Although those privileges are limited to this page, compromising churrumais is sufficient to ac
 hieve our goal.
 
-![ima](/assets/images/htb-writeup-postman/cuento_v31.png)
+![ima](/assets/images/htb-writeup-cuento/cuento_v31.png)
 
 ```
 Now that we've set up the listener, it's time to execute the reverse shell.
