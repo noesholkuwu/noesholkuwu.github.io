@@ -7,7 +7,7 @@ classes: wide
 header:
   teaser: /assets/images/htb-writeup-postman/cuento.png
   teaser_home_page: true
-  icon: /assets/images/hackthebox.webp
+  icon: /assets/images/htb-writeup-postman/logothehack.png
 categories:
   - the hackers labs
   - infosec
